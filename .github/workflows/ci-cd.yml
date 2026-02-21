@@ -10,6 +10,10 @@ env:
   DOCKER_REGISTRY: docker.io
 
 jobs:
+
+  # -----------------------------
+  #  PARTIE 1 : CI - Build & Push
+  # -----------------------------
   build:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
@@ -33,6 +37,9 @@ jobs:
           docker push $IMAGE_NAME:$IMAGE_TAG
 
 
+  # --------------------------------------
+  #  PARTIE 2 : Scan de sécurité - TRIVY
+  # --------------------------------------
   scan:
     name: Scan vulnerabilities with Trivy
     runs-on: ubuntu-latest
@@ -46,3 +53,29 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 1
           ignore-unfixed: true
+
+
+  # --------------------------------------
+  #  PARTIE 3 : CD - Déploiement serveur
+  # --------------------------------------
+  deploy:
+    name: Deploy to Server
+    runs-on: self-hosted
+    needs: scan
+
+    steps:
+      - name: Pull latest image from Docker Hub
+        run: |
+          docker pull $IMAGE_NAME:$IMAGE_TAG
+
+      - name: Stop existing container if running
+        run: |
+          docker stop webapp || true
+
+      - name: Remove old container if exists
+        run: |
+          docker rm webapp || true
+
+      - name: Run new container
+        run: |
+          docker run -d --name webapp -p 80:80 $IMAGE_NAME:$IMAGE_TAG
